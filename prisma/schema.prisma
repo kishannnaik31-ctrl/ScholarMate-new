@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum Category {
+  GENERAL
+  SC
+  ST
+  OBC
+  EWS
+}
+
+enum ProviderType {
+  GOVERNMENT
+  CORPORATE
+  NGO
+  UNIVERSITY
+}
+
+enum ScholarshipStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+enum VerificationStatus {
+  VERIFIED
+  UNVERIFIED
+}
+
+enum BenefitType {
+  FULL_TUITION
+  PARTIAL_TUITION
+  STIPEND
+  LAPTOP
+  OTHER
+}
+
+// -----------------------------------------------------------------------------
+// USER & PROFILE
+// -----------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid // Maps to Supabase Auth UUID
+  email     String   @unique
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile StudentProfile?
+}
+
+model StudentProfile {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @unique @db.Uuid
+  gender              Gender
+  category            Category
+  disabilityStatus    Boolean  @default(false)
+  familyIncome        Int      // Annual income in INR
+  stateId             String   @db.Uuid
+  districtId          String   @db.Uuid
+  educationLevelId    String   @db.Uuid
+  courseId            String   @db.Uuid
+  academicYear        Int
+  academicPerformance Decimal  @db.Decimal(5, 2) // Percentage or CGPA
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  state          State            @relation(fields: [stateId], references: [id])
+  district       District         @relation(fields: [districtId], references: [id])
+  educationLevel EducationLevel   @relation(fields: [educationLevelId], references: [id])
+  course         Course           @relation(fields: [courseId], references: [id])
+
+  savedScholarships SavedScholarship[]
+
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// TAXONOMY (ACADEMIC & GEOGRAPHIC)
+// -----------------------------------------------------------------------------
+
+model State {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique
+  code String @unique
+
+  districts                 District[]
+  studentProfiles           StudentProfile[]
+  scholarshipRequiredStates ScholarshipRequiredState[]
+}
+
+model District {
+  id      String @id @default(uuid()) @db.Uuid
+  stateId String @db.Uuid
+  name    String
+
+  state           State            @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  studentProfiles StudentProfile[]
+
+  @@unique([stateId, name])
+}
+
+model EducationLevel {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique
+
+  courses                          Course[]
+  studentProfiles                  StudentProfile[]
+  scholarshipRequiredEducationLvls ScholarshipRequiredEducationLevel[]
+}
+
+model Course {
+  id               String @id @default(uuid()) @db.Uuid
+  educationLevelId String @db.Uuid
+  name             String
+
+  educationLevel             EducationLevel              @relation(fields: [educationLevelId], references: [id], onDelete: Cascade)
+  studentProfiles            StudentProfile[]
+  scholarshipRequiredCourses ScholarshipRequiredCourse[]
+
+  @@unique([educationLevelId, name])
+}
+
+model Discipline {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique
+}
+
+// -----------------------------------------------------------------------------
+// SCHOLARSHIPS & PROVIDERS
+// -----------------------------------------------------------------------------
+
+model ScholarshipProvider {
+  id         String       @id @default(uuid()) @db.Uuid
+  name       String
+  type       ProviderType
+  websiteUrl String
+
+  scholarships Scholarship[]
+}
+
+model Scholarship {
+  id                     String             @id @default(uuid()) @db.Uuid
+  providerId             String             @db.Uuid
+  name                   String
+  description            String
+  officialApplicationUrl String             // Must be the direct official link
+  deadline               DateTime?
+  status                 ScholarshipStatus  @default(DRAFT)
+  verificationStatus     VerificationStatus @default(UNVERIFIED)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  provider ScholarshipProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  benefits           ScholarshipBenefit[]
+  eligibilityRule    ScholarshipEligibilityRule?
+  requiredStates     ScholarshipRequiredState[]
+  requiredCategories ScholarshipRequiredCategory[]
+  requiredEduLevels  ScholarshipRequiredEducationLevel[]
+  requiredCourses    ScholarshipRequiredCourse[]
+  savedByStudents    SavedScholarship[]
+
+  @@index([deadline])
+  @@index([status, verificationStatus])
+}
+
+model ScholarshipBenefit {
+  id            String      @id @default(uuid()) @db.Uuid
+  scholarshipId String      @db.Uuid
+  type          BenefitType
+  amount        Decimal?    @db.Decimal(10, 2)
+  description   String
+
+  scholarship Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// ELIGIBILITY RULES (STRUCTURED DATA FOR ENGINE)
+// -----------------------------------------------------------------------------
+
+model ScholarshipEligibilityRule {
+  id                     String   @id @default(uuid()) @db.Uuid
+  scholarshipId          String   @unique @db.Uuid
+  minFamilyIncome        Int?
+  maxFamilyIncome        Int?
+  minAcademicPerformance Decimal? @db.Decimal(5, 2)
+  requiredGender         Gender?
+  requiresDisability     Boolean?
+
+  scholarship Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+}
+
+model ScholarshipRequiredState {
+  scholarshipId String @db.Uuid
+  stateId       String @db.Uuid
+
+  scholarship Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  state       State       @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@id([scholarshipId, stateId])
+}
+
+model ScholarshipRequiredCategory {
+  scholarshipId String   @db.Uuid
+  category      Category
+
+  scholarship Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+
+  @@id([scholarshipId, category])
+}
+
+model ScholarshipRequiredEducationLevel {
+  scholarshipId    String @db.Uuid
+  educationLevelId String @db.Uuid
+
+  scholarship    Scholarship    @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  educationLevel EducationLevel @relation(fields: [educationLevelId], references: [id], onDelete: Cascade)
+
+  @@id([scholarshipId, educationLevelId])
+}
+
+model ScholarshipRequiredCourse {
+  scholarshipId String @db.Uuid
+  courseId      String @db.Uuid
+
+  scholarship Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([scholarshipId, courseId])
+}
+
+// -----------------------------------------------------------------------------
+// USER ENGAGEMENT
+// -----------------------------------------------------------------------------
+
+model SavedScholarship {
+  id               String   @id @default(uuid()) @db.Uuid
+  studentProfileId String   @db.Uuid
+  scholarshipId    String   @db.Uuid
+  savedAt          DateTime @default(now())
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  scholarship    Scholarship    @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+
+  @@unique([studentProfileId, scholarshipId])
+}
