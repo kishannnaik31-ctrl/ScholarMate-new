@@ -8,6 +8,10 @@ The Eligibility Engine is the intellectual core of Scholar Mate. Its sole purpos
 - **Explainable**: The engine must return reasons *why* a scholarship matched or failed (e.g., "Income exceeds maximum threshold of ₹2,50,000").
 - **Strict Information handling**: Missing information is NEVER treated as a match. It results in a specific `NEEDS_INFORMATION` status.
 - **Testable**: The engine is a pure TypeScript service, decoupled from Next.js request/response objects or direct UI dependencies. It takes a typed `Profile` object and a typed `ScholarshipRule` object as inputs.
+- **Efficient**: Eligibility evaluation must remain deterministic and efficient.
+- **Pre-filtering**: Filter candidates at the database/query level before detailed evaluation where possible. Do not scan all scholarships for every request if a narrower candidate query can be performed.
+- **No Duplicate Work**: Avoid repeated eligibility computation within a single request. Avoid recalculating identical results unnecessarily.
+- **No Premature Caching**: Caching may be considered only for measured hot or expensive workloads. Do not add Redis or any caching dependency now.
 
 ## 3. Evaluation Statuses
 

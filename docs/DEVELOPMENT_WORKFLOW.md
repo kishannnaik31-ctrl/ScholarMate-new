@@ -18,7 +18,7 @@ For **EVERY** major task, developers and AI agents must follow these phases stri
 ### PHASE B — PLAN
 - Determine what needs to change, why, and how to verify it.
 - Identify what must remain unchanged.
-- **Rule**: Do not design solutions that require unapproved stack changes or random dependencies.
+- **Rule**: Do not design solutions that require unapproved stack changes or random dependencies. (e.g., No Redis, Kafka, Microservices, or separate caching infrastructure without explicit approval).
 
 ### PHASE C — IMPLEMENT
 - Write the smallest, cleanest implementation that satisfies the requirement.
@@ -32,6 +32,7 @@ For **EVERY** major task, developers and AI agents must follow these phases stri
   - `npm run build` (TypeScript/Next.js build)
   - `npm test` (if tests are written)
   - Database schema validations (if Prisma is modified)
+  - For major milestones, validation must also include **Scalability and Production Readiness** checks (load testing, query profiling, connection pressure testing) before claiming concurrency support.
 
 ### PHASE E — REPORT
 - Document exactly what was created, modified, or deleted.
